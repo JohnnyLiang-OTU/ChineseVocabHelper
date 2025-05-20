@@ -1,6 +1,6 @@
 from typing import List
 import csv
-from pycccedict.cccedict import CcCedict
+from pycccedict.cccedict import CcCedict, resource_path
 from pypinyin import lazy_pinyin, Style
 
 ccdict = CcCedict()
@@ -18,10 +18,12 @@ class Word:
 class DB:
     def __init__(self):
         self.arrayer: List[Word] = []
+        self.csv_path = resource_path("data/database.csv")
         self.read_db() # Populates arrayer
+
         
     def read_db(self):
-        with open('database.csv', 'r', encoding='utf-8') as file:
+        with open(self.csv_path, 'r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             for row in reader:
                 word = Word(
@@ -32,7 +34,7 @@ class DB:
                 self.arrayer_append(word)
     
     def update_db(self):
-        with open('database.csv', 'w', encoding='utf-8', newline='') as file:
+        with open(self.csv_path, 'w', encoding='utf-8', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=['Char', 'Pinyin', 'Translation'])
             writer.writeheader()
             for word in self.arrayer:

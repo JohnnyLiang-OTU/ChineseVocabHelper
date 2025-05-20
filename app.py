@@ -18,8 +18,29 @@ class ChineseHelperApp(QMainWindow):
         
         # Initialize UI
         self.setWindowTitle("Chinese Helper")
+        self.setStyleSheet("""
+                            QWidget {
+                                font-family: 'Segoe UI';
+                                font-size: 14px;
+                            }
+                            QTableWidget {
+                                gridline-color: #dcdcdc;
+                            }
+                            QHeaderView::section {
+                                padding: 4px;
+                                font-weight: bold;
+                            }
+                            QLineEdit, QPushButton {
+                                padding: 6px;
+                                border: 1px solid #ccc;
+                                border-radius: 4px;
+                            }
+                            QPushButton:hover {
+                                background-color: #e6f2ff;
+                            }
+                        """)
         self.resize(1280, 720)
-        
+    
         # Initialize database
         self.db = DB()
         
@@ -27,6 +48,8 @@ class ChineseHelperApp(QMainWindow):
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.main_layout = QVBoxLayout(self.central_widget)
+        self.main_layout.setSpacing(15)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
         
         # Create UI components
         self.create_widgets()
@@ -119,6 +142,12 @@ class ChineseHelperApp(QMainWindow):
         self.submit_button = QPushButton("Submit")
         self.submit_button.clicked.connect(self.entry_submit)
         
+        # Toque aestetico
+        input_layout.setContentsMargins(10, 10, 10, 10)
+        input_layout.setSpacing(10)
+        self.entry.setMinimumHeight(30)
+        self.submit_button.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+
         # Add widgets to input layout
         input_layout.addWidget(self.entry_label)
         input_layout.addWidget(self.entry)
