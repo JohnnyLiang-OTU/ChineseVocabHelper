@@ -1,4 +1,4 @@
-from Classes import DB
+from Classes import DB, Word
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QTableWidget, QTableWidgetItem, 
@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 from pycccedict.cccedict import CcCedict
+import random
 
 ccdict = CcCedict()
 FONT = QFont("Arial", 14)  # Adjust size as needed
@@ -50,17 +51,25 @@ class ChineseHelperApp(QMainWindow):
         checkbox_layout = QHBoxLayout(checkbox_frame)
         checkbox_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Checkboxes for toggling columns
+        # Checkboxes for toggling columns "Pinyin"
         self.pinyin_checkbox = QCheckBox("Pinyin")
         self.pinyin_checkbox.setChecked(True)
         self.pinyin_checkbox.toggled.connect(self.toggle_pinyin)
-        
+
+        # Checkboxes for toggling columns "Translation"
         self.translation_checkbox = QCheckBox("Translation")
         self.translation_checkbox.setChecked(True)
         self.translation_checkbox.toggled.connect(self.toggle_translation)
         
+        # Button for Shuffling
+        shuffle_button = QPushButton("Shuffle")
+        shuffle_button.clicked.connect(self.shuffle_table_rows)
+
+
+        # Add checkboxes and button into the Checkbox layout
         checkbox_layout.addWidget(self.pinyin_checkbox)
         checkbox_layout.addWidget(self.translation_checkbox)
+        checkbox_layout.addWidget(shuffle_button)
         checkbox_layout.addStretch()
         
         # Table Widget
@@ -68,11 +77,14 @@ class ChineseHelperApp(QMainWindow):
         self.table.setHorizontalHeaderLabels(["Character", "Pinyin", "Translation"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.verticalHeader().setVisible(False)
+        self.table.itemChanged.connect(self.handle_item_changed)
+
 
         # Column Width
         self.table.setColumnWidth(0, 60) # Char
         self.table.setColumnWidth(1, 100) # Pinyin
 
+        # Set the ResizeMode of the Headers
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -143,7 +155,9 @@ class ChineseHelperApp(QMainWindow):
         """Load data from database to table"""
         self.table.setRowCount(0)
         for word in self.db.arrayer:
+            self.table.blockSignals(True)
             self.add_row_to_table(word)
+            self.table.blockSignals(False)
         
     def entry_submit(self):
         """Handle submission of new word"""
@@ -159,6 +173,7 @@ class ChineseHelperApp(QMainWindow):
                 # Find and select the existing row
                 self.find_and_select_row(word.char)
             else:
+                self.table.blockSignals(True)
                 # Add the new word
                 new_word = self.db.push_new_char(input_text)
                 
@@ -167,8 +182,10 @@ class ChineseHelperApp(QMainWindow):
 
                 # Select the newly added row
                 self.table.selectRow(row_position)
+
+                self.table.blockSignals(False)
                         
-                        # Clear input field
+            # Clear input field
             self.entry.clear()
     
     def show_duplicate_notification(self, char_text):
@@ -187,7 +204,12 @@ class ChineseHelperApp(QMainWindow):
                 self.table.selectRow(row)
                 self.table.scrollToItem(item)
                 break
-            
+    
+    def translation_save(self):
+        print("Changing Translation of this Row Item...")
+        return
+
+
     def database_save(self):
         """Save database changes"""
         self.db.update_db()
@@ -201,6 +223,10 @@ class ChineseHelperApp(QMainWindow):
         char_item = QTableWidgetItem(word.char)
         pinyin_item = QTableWidgetItem(word.pinyin)
         translation_item = QTableWidgetItem(word.translation)
+
+        char_item.setFlags(char_item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # char not editable
+        pinyin_item.setFlags(pinyin_item.flags() | Qt.ItemFlag.ItemIsEditable)
+        translation_item.setFlags(translation_item.flags() | Qt.ItemFlag.ItemIsEditable)
 
         char_item.setFont(FONT)
         pinyin_item.setFont(FONT)
@@ -217,6 +243,55 @@ class ChineseHelperApp(QMainWindow):
         self.table.setItem(row_position, 2, translation_item)
 
         return row_position
+    
+    def handle_item_changed(self, item):
+        """Update the corresponding word in the DB when the table is edited."""
+        row = item.row()
+        column = item.column()
+        new_value = item.text()
+
+        # Get character to identify the word (column 0 is char)
+        char_item = self.table.item(row, 0)
+        if not char_item:
+            return
+
+        char = char_item.text()
+
+        # Find the word in the DB
+        word = self.db.get_word_by_char(char)
+        if not word:
+            return
+
+        # Update the field based on column
+        if column == 1:  # Pinyin
+            word.pinyin = new_value
+        elif column == 2:  # Translation
+            word.translation = new_value
+        
+        self.table.resizeRowsToContents()
+
+    def shuffle_table_rows(self):
+        # Extract current data from the table
+        data = []
+        for row in range(self.table.rowCount()):
+            char = self.table.item(row, 0).text()
+            pinyin = self.table.item(row, 1).text()
+            translation = self.table.item(row, 2).text()
+            data.append((char, pinyin, translation))
+        
+        # Shuffle the data
+        random.shuffle(data)
+        
+        # Temporarily block signals to avoid triggering itemChanged
+        self.table.blockSignals(True)
+
+        # Clear and repopulate the table
+        self.table.setRowCount(0)
+        for char, pinyin, translation in data:
+            self.add_row_to_table(Word(char, pinyin, translation))
+        
+        self.table.blockSignals(False)
+
 
 def main():
     app = QApplication(sys.argv)
