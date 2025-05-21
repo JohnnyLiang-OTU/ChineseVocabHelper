@@ -85,3 +85,6 @@ class DB:
             if word.char == char_text:
                 return word
         return None
+    
+    def remove_by_char(self, char):
+        self.arrayer = [word for word in self.arrayer if word.char != char]

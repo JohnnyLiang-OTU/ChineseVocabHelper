@@ -35,9 +35,6 @@ class ChineseHelperApp(QMainWindow):
                                 border: 1px solid #ccc;
                                 border-radius: 4px;
                             }
-                            QPushButton:hover {
-                                background-color: #e6f2ff;
-                            }
                         """)
         self.resize(1280, 720)
     
@@ -96,8 +93,8 @@ class ChineseHelperApp(QMainWindow):
         checkbox_layout.addStretch()
         
         # Table Widget
-        self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Character", "Pinyin", "Translation"])
+        self.table = QTableWidget(0, 4)  # now 4 columns
+        self.table.setHorizontalHeaderLabels(["Character", "Pinyin", "Translation", "Delete"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.verticalHeader().setVisible(False)
         self.table.itemChanged.connect(self.handle_item_changed)
@@ -112,6 +109,8 @@ class ChineseHelperApp(QMainWindow):
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+
         
         # Load initial data to table
         self.load_data_from_db()
@@ -187,7 +186,10 @@ class ChineseHelperApp(QMainWindow):
             self.table.blockSignals(True)
             self.add_row_to_table(word)
             self.table.blockSignals(False)
+
+        self.table.resizeRowsToContents()
         
+
     def entry_submit(self):
         """Handle submission of new word"""
         input_text = self.entry.text()
@@ -216,6 +218,8 @@ class ChineseHelperApp(QMainWindow):
                         
             # Clear input field
             self.entry.clear()
+        
+        self.table.resizeRowsToContents()
     
     def show_duplicate_notification(self, char_text):
         """Show a notification that the character already exists"""
@@ -245,7 +249,6 @@ class ChineseHelperApp(QMainWindow):
         QMessageBox.information(self, "Save Complete", "Your collection has been saved.")
 
     def add_row_to_table(self, word):
-        """Create and insert a formatted row into the table for the given word."""
         row_position = self.table.rowCount()
         self.table.insertRow(row_position)
 
@@ -253,25 +256,25 @@ class ChineseHelperApp(QMainWindow):
         pinyin_item = QTableWidgetItem(word.pinyin)
         translation_item = QTableWidgetItem(word.translation)
 
-        char_item.setFlags(char_item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # char not editable
+        char_item.setFlags(char_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         pinyin_item.setFlags(pinyin_item.flags() | Qt.ItemFlag.ItemIsEditable)
         translation_item.setFlags(translation_item.flags() | Qt.ItemFlag.ItemIsEditable)
 
-        char_item.setFont(FONT)
-        pinyin_item.setFont(FONT)
-        translation_item.setFont(FONT)
-
-        char_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        pinyin_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        translation_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        translation_item.setToolTip(word.translation)
+        for item in (char_item, pinyin_item, translation_item):
+            item.setFont(FONT)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.table.setItem(row_position, 0, char_item)
         self.table.setItem(row_position, 1, pinyin_item)
         self.table.setItem(row_position, 2, translation_item)
 
-        return row_position
+        # Create delete button
+        delete_button = QPushButton("✕")
+        delete_button.setToolTip("Delete this entry")
+        delete_button.clicked.connect(self.handle_delete)
+        self.table.setCellWidget(row_position, 3, delete_button)
+
+
     
     def handle_item_changed(self, item):
         """Update the corresponding word in the DB when the table is edited."""
@@ -320,6 +323,50 @@ class ChineseHelperApp(QMainWindow):
             self.add_row_to_table(Word(char, pinyin, translation))
         
         self.table.blockSignals(False)
+
+    def add_row_to_table(self, word):
+        row_position = self.table.rowCount()
+        self.table.insertRow(row_position)
+
+        char_item = QTableWidgetItem(word.char)
+        pinyin_item = QTableWidgetItem(word.pinyin)
+        translation_item = QTableWidgetItem(word.translation)
+
+        char_item.setFlags(char_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        pinyin_item.setFlags(pinyin_item.flags() | Qt.ItemFlag.ItemIsEditable)
+        translation_item.setFlags(translation_item.flags() | Qt.ItemFlag.ItemIsEditable)
+
+        for item in (char_item, pinyin_item, translation_item):
+            item.setFont(FONT)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.table.setItem(row_position, 0, char_item)
+        self.table.setItem(row_position, 1, pinyin_item)
+        self.table.setItem(row_position, 2, translation_item)
+
+        # Create delete button
+        delete_button = QPushButton("✕")
+        delete_button.setToolTip("Delete this entry")
+        delete_button.clicked.connect(self.handle_delete)
+        self.table.setCellWidget(row_position, 3, delete_button)
+
+
+    def handle_delete(self):
+        button = self.sender()
+        if not button:
+            return
+
+        # Get the index of the button in the table
+        for row in range(self.table.rowCount()):
+            if self.table.cellWidget(row, 3) == button:
+                char_item = self.table.item(row, 0)
+                if char_item:
+                    char = char_item.text()
+                    self.db.remove_by_char(char)
+                self.table.removeRow(row)
+                break
+
+
 
 
 def main():
